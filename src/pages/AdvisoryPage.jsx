@@ -5,6 +5,23 @@ import { useTranslation } from "react-i18next";
 
 const cropOptions = ["Wheat", "Rice", "Maize", "Paddy", "Sugarcane", "Soybean"];
 
+const dummyNDVI = {
+  ndvi_mean: 0.45,
+  ndvi_min: 0.2,
+  ndvi_max: 0.6,
+  ndvi_breakdown: {
+    poor_percent: 20,
+    moderate_percent: 50,
+    good_percent: 30
+  }
+};
+
+const dummyWeather = [
+  { date: "2025-06-12", maxTemp: 35, minTemp: 25, rainfall: 2 },
+  { date: "2025-06-13", maxTemp: 34, minTemp: 24, rainfall: 1 },
+  { date: "2025-06-14", maxTemp: 36, minTemp: 26, rainfall: 0 }
+];
+
 const Advisory = () => {
   const { t } = useTranslation();
   const [latitude, setLatitude] = useState(() => parseFloat(localStorage.getItem("cachedLat")) || 21.8294671);
@@ -12,90 +29,19 @@ const Advisory = () => {
   const [crop, setCrop] = useState("Wheat");
   const [stage, setStage] = useState("Growth");
   const [language, setLanguage] = useState("Hindi");
-  const [ndviData, setNdviData] = useState(null);
-  const [weatherData, setWeatherData] = useState(null);
+  const [ndviData, setNdviData] = useState(dummyNDVI);
+  const [weatherData, setWeatherData] = useState(dummyWeather);
   const [advisoryText, setAdvisoryText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState("");
 
-  const defaultWeather = [
-    { date: "2025-06-12", maxTemp: 35, minTemp: 25, rainfall: 2 },
-    { date: "2025-06-13", maxTemp: 34, minTemp: 24, rainfall: 1 },
-    { date: "2025-06-14", maxTemp: 36, minTemp: 26, rainfall: 0 }
-  ];
-
-  const defaultNDVI = {
-    ndvi_mean: 0.45,
-    ndvi_min: 0.2,
-    ndvi_max: 0.6,
-    ndvi_breakdown: {
-      poor_percent: 20,
-      moderate_percent: 50,
-      good_percent: 30
-    }
-  };
-
+  // Cache lat/lng in localStorage
   useEffect(() => {
     localStorage.setItem("cachedLat", latitude.toString());
     localStorage.setItem("cachedLng", longitude.toString());
   }, [latitude, longitude]);
 
-  useEffect(() => {
-    const fetchWeatherAndNDVI = async () => {
-      const cacheKey = `weather_ndvi_${latitude}_${longitude}`;
-      const cached = localStorage.getItem(cacheKey);
-
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        setWeatherData(parsed.weather || defaultWeather);
-        setNdviData(parsed.ndvi || defaultNDVI);
-        return;
-      }
-
-      let weather = defaultWeather;
-      let ndvi = defaultNDVI;
-
-      try {
-        const weatherRes = await axios.get("https://api.open-meteo.com/v1/forecast", {
-          params: {
-            latitude,
-            longitude,
-            daily: "temperature_2m_max,temperature_2m_min,precipitation_sum",
-            forecast_days: 3,
-            timezone: "auto"
-          }
-        });
-        const daily = weatherRes.data.daily;
-        weather = daily.time.map((date, i) => ({
-          date,
-          maxTemp: daily.temperature_2m_max[i],
-          minTemp: daily.temperature_2m_min[i],
-          rainfall: daily.precipitation_sum[i]
-        }));
-      }
-       catch {
-        console.warn("Weather API failed, using defaults.");
-      }
-
-      try {
-        const ndviRes = await axios.get("https://ndvi-api-server.onrender.com/ndvi", {
-          params: { lat: latitude, lng: longitude }
-        });
-        const response = ndviRes.data;
-        if (response.ndvi_mean) ndvi = response;
-      } 
-      catch {
-        console.warn("NDVI API failed, using defaults.");
-      }
-
-      localStorage.setItem(cacheKey, JSON.stringify({ weather, ndvi }));
-      setWeatherData(weather);
-      setNdviData(ndvi);
-    };
-
-    fetchWeatherAndNDVI();
-  }, [latitude, longitude]);
-
+  // Fetch advisory from backend
   const fetchAdvisory = async (topic) => {
     setIsLoading(true);
     setSelectedTopic(topic);
@@ -118,7 +64,7 @@ const Advisory = () => {
     catch {
       setAdvisoryText(t("fetch_failed"));
     }
-     finally {
+    finally {
       setIsLoading(false);
     }
   };
@@ -166,6 +112,7 @@ const Advisory = () => {
         </div>
       </div>
 
+      {/* Crop, Stage, Language */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2">
           <label className="text-sm font-semibold">{t("language")}</label>
@@ -190,16 +137,17 @@ const Advisory = () => {
         </div>
       </div>
 
-      {/* Weather + NDVI */}
+      {/* NDVI + Weather */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-green-50 p-4 rounded shadow space-y-2">
           <h3 className="text-green-800 font-semibold">{t("ndvi_overview")}</h3>
-          <p>{t("mean")}: {ndviData?.ndvi_mean ?? "-"}, {t("min")}: {ndviData?.ndvi_min ?? "-"}, {t("max")}: {ndviData?.ndvi_max ?? "-"}</p>
-          <p>{t("poor")}: {ndviData?.ndvi_breakdown?.poor_percent ?? 0}%, {t("moderate")}: {ndviData?.ndvi_breakdown?.moderate_percent ?? 0}%, {t("good")}: {ndviData?.ndvi_breakdown?.good_percent ?? 0}%</p>
+          <p>{t("mean")}: {ndviData.ndvi_mean}, {t("min")}: {ndviData.ndvi_min}, {t("max")}: {ndviData.ndvi_max}</p>
+          <p>{t("poor")}: {ndviData.ndvi_breakdown.poor_percent}%, {t("moderate")}: {ndviData.ndvi_breakdown.moderate_percent}%, {t("good")}: {ndviData.ndvi_breakdown.good_percent}%</p>
         </div>
+
         <div className="bg-blue-50 p-4 rounded shadow space-y-2">
           <h3 className="text-blue-800 font-semibold">{t("weather_update")}</h3>
-          {weatherData?.map((d, i) => (
+          {weatherData.map((d, i) => (
             <p key={i}>{d.date}: {t("max")}: {d.maxTemp}°C, {t("min")}: {d.minTemp}°C, {t("rain")}: {d.rainfall}mm</p>
           ))}
         </div>
