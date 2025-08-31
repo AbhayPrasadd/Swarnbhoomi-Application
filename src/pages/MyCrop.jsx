@@ -1,19 +1,14 @@
 import React, { useEffect, useState } from "react";
-import { db, auth } from "../firebase";
-import { doc, getDoc, updateDoc, collection, getDocs } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 
 const commodityImages = {
-  // Fruits
   Mango: "/fruits/mango.jpeg",
   Apple: "/fruits/apple.jpeg",
   Guava: "/fruits/guava.jpeg",
   Banana: "/fruits/banana.jpeg",
   Pomegranate: "/fruits/pomegranate.jpeg",
   Papaya: "/fruits/papaya.jpeg",
-
-  // Vegetables
   Onion: "/vegetables/onion.jpg",
   Tomato: "/vegetables/tomato.jpg",
   Potato: "/vegetables/potato.jpg",
@@ -22,91 +17,90 @@ const commodityImages = {
   Cauliflower: "/vegetables/cauliflower.jpg",
   Carrot: "/vegetables/carrot.jpg",
   Peas: "/vegetables/peas.jpg",
-
-  // Oilseeds
   Groundnut: "/oilseeds/groundnut.jpeg",
   Soyabean: "/oilseeds/soyabean.jpeg",
-
-  // Spices
   Garlic: "/spices/garlic.jpeg",
   Ginger: "/spices/ginger.jpeg",
   "Green Chilli": "/spices/chilli.jpeg",
-
-  // Cereals / Crops
   Wheat: "/cereals/wheat.jpeg",
   Rice: "/cereals/rice.jpeg",
   Bajra: "/cereals/barley.jpeg",
+};
+
+// Dummy crop guide data
+const dummyCropGuide = {
+  Wheat: {
+    description: "Wheat is a staple cereal crop grown widely for its grain.",
+    weeklyGuide: [
+      "Sow seeds in prepared soil.",
+      "Ensure proper irrigation.",
+      "Apply nitrogen fertilizer.",
+      "Monitor for pests.",
+      "Harvest when grains turn golden.",
+    ],
+    fertilizerTips: "Use nitrogen-rich fertilizer in the 2nd week.",
+    irrigationTips: "Water moderately once a week.",
+    diseaseTips: "Check for rust and blight.",
+    image: "/cereals/wheat.jpeg",
+  },
+  Tomato: {
+    description: "Tomatoes are nutritious and require well-drained soil.",
+    weeklyGuide: [
+      "Plant seedlings in pots or field.",
+      "Water daily in early morning.",
+      "Apply organic manure.",
+      "Watch for fungal infections.",
+      "Start harvesting ripe tomatoes.",
+    ],
+    fertilizerTips: "Use compost or NPK 10-10-10 fertilizer.",
+    irrigationTips: "Keep soil moist, avoid waterlogging.",
+    diseaseTips: "Check for leaf curl virus.",
+    image: "/vegetables/tomato.jpg",
+  },
+  Mango: {
+    description: "Mango trees are tropical fruit crops needing warm climate.",
+    weeklyGuide: [
+      "Plant young saplings.",
+      "Apply mulch to retain soil moisture.",
+      "Prune dead branches.",
+      "Apply phosphorus fertilizer.",
+      "Check fruit growth and ripeness.",
+    ],
+    fertilizerTips: "Use organic manure and NPK 12-12-17.",
+    irrigationTips: "Water deeply once a week.",
+    diseaseTips: "Monitor for anthracnose.",
+    image: "/fruits/mango.jpeg",
+  },
+};
+
+const dummyUserCrops = ["Wheat", "Tomato", "Mango"];
+const dummySowingDates = {
+  Wheat: dayjs().subtract(3, "week").format("YYYY-MM-DD"),
+  Tomato: dayjs().subtract(1, "week").format("YYYY-MM-DD"),
+  Mango: dayjs().subtract(5, "week").format("YYYY-MM-DD"),
 };
 
 const MyCrop = () => {
   const [selectedCrops, setSelectedCrops] = useState([]);
   const [sowingDates, setSowingDates] = useState({});
   const [loading, setLoading] = useState(true);
-  const [cropGuideData, setCropGuideData] = useState({});
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchUserCrops = async () => {
-      try {
-        const user = auth.currentUser;
-        if (!user) return;
-
-        const docRef = doc(db, "users", user.uid);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          const cropMap = data.primaryCrops;
-          const dates = data.sowingDates || {};
-
-          if (cropMap && Object.keys(cropMap).length > 0) {
-            const allCrops = Object.values(cropMap).flat();
-            setSelectedCrops(allCrops);
-            setSowingDates(dates);
-          } else {
-            alert("⚠️ You haven't selected any crops yet. Complete Your Profile First");
-            navigate("/dashboard/profile");
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching user crops:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUserCrops();
-  }, [navigate]);
-
-  useEffect(() => {
-    const fetchCropGuide = async () => {
-      const snap = await getDocs(collection(db, "cropGuide"));
-      const guide = {};
-      snap.docs.forEach((doc) => {
-        const data = doc.data();
-        guide[data.name] = data;
-      });
-      setCropGuideData(guide);
-    };
-    fetchCropGuide();
+    // Simulate fetching user crops
+    setTimeout(() => {
+      setSelectedCrops(dummyUserCrops);
+      setSowingDates(dummySowingDates);
+      setLoading(false);
+    }, 500);
   }, []);
 
   const handleSowingDateChange = (crop, date) => {
     setSowingDates((prev) => ({ ...prev, [crop]: date }));
   };
 
-  const handleSaveDate = async (crop) => {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    try {
-      const docRef = doc(db, "users", user.uid);
-      const updated = { ...sowingDates };
-      await updateDoc(docRef, { sowingDates: updated });
-      alert(`✅ Saved sowing date for ${crop}`);
-    } catch (error) {
-      console.error("Error saving sowing date:", error);
-    }
+  const handleSaveDate = (crop) => {
+    alert(`✅ Saved sowing date for ${crop}: ${sowingDates[crop]}`);
   };
 
   const calculateWeeksSinceSowing = (dateStr) => {
@@ -137,15 +131,11 @@ const MyCrop = () => {
         {selectedCrops.map((crop) => {
           const sowingDate = sowingDates[crop] || "";
           const week = sowingDate ? calculateWeeksSinceSowing(sowingDate) : null;
-          const info = cropGuideData[crop];
-
+          const info = dummyCropGuide[crop];
           const cropImage = info?.image || commodityImages[crop] || "/vegetables/default.jpg";
 
           return (
-            <div
-              key={crop}
-              className=" border-gray-200 shadow-md p-4  flex flex-col justify-between"
-            >
+            <div key={crop} className="border-gray-200 shadow-md p-4 flex flex-col justify-between">
               <div>
                 <img
                   src={cropImage}
